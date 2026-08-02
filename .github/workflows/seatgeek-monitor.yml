@@ -1,0 +1,53 @@
+name: SeatGeek monitor
+
+on:
+  schedule:
+    # GitHub Actions schedules can run no more often than every five minutes.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: seatgeek-monitor-state
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out state
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check the SeatGeek event
+        run: npm run check
+        env:
+          SEATGEEK_CLIENT_ID: ${{ secrets.SEATGEEK_CLIENT_ID }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          EVENT_ID: "18390890"
+          MAX_PRICE: "600"
+          POLL_INTERVAL_SECONDS: "300"
+          # This committed file contains alert state only, never credentials.
+          STATE_FILE: .seatgeek-state.json
+
+      - name: Persist alert state
+        if: success()
+        run: |
+          git add .seatgeek-state.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: update SeatGeek monitor state [skip ci]"
+          git push

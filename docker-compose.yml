@@ -1,0 +1,13 @@
+services:
+  seatgeek-monitor:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      STATE_FILE: /data/seatgeek-state.json
+    volumes:
+      - seatgeek-state:/data
+
+volumes:
+  seatgeek-state:
